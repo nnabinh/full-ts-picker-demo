@@ -8,7 +8,7 @@
  * @format
  */
 
-import React, {useState} from 'react';
+import React, {useRef} from 'react';
 import {
   SafeAreaView,
   StatusBar,
@@ -16,10 +16,49 @@ import {
   Text,
   useColorScheme,
   View,
+  Animated,
 } from 'react-native';
-import SmoothPicker from 'react-native-smooth-picker';
 
 import {Colors} from 'react-native/Libraries/NewAppScreen';
+
+const ROW_HEIGHT = 60;
+const INACTIVE_ROW_HEIGHT = 40;
+
+const MinItem = ({index, y, item}: any) => {
+  const translateY = y;
+
+  return (
+    <Animated.View
+      style={[
+        styles.inActiveRowContainer,
+        {
+          transform: [
+            {
+              scale: translateY.interpolate({
+                inputRange: [
+                  INACTIVE_ROW_HEIGHT * (index - 5) - 20,
+                  INACTIVE_ROW_HEIGHT * (index - 4) - 20,
+                  INACTIVE_ROW_HEIGHT * (index - 3) - 20,
+                  INACTIVE_ROW_HEIGHT * (index - 2) - 20,
+                  INACTIVE_ROW_HEIGHT * (index - 1) - 20,
+                  INACTIVE_ROW_HEIGHT * (index - 0) - 20,
+                  INACTIVE_ROW_HEIGHT * (index + 1) - 20,
+                ],
+                outputRange: [1, 1, 1, 2, 1, 1, 1],
+              }),
+            },
+          ],
+        },
+      ]}>
+      <Text style={styles.inActiveRowText}>
+        {item.toLocaleString('en-US', {
+          minimumIntegerDigits: 2,
+          useGrouping: false,
+        })}
+      </Text>
+    </Animated.View>
+  );
+};
 
 const App = () => {
   const isDarkMode = useColorScheme() === 'dark';
@@ -27,9 +66,28 @@ const App = () => {
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
+  const selectedItem = useRef(0);
 
-  const [hour, setHour] = useState(8);
-  const [minute, setMinute] = useState(0);
+  const hourData = Array.from({length: 24}, (_, i) => i + 1);
+  const minData = Array.from({length: 60}, (_, i) => i).filter(
+    x => x % 5 === 0,
+  );
+
+  const yForHour = new Animated.Value(0);
+  const onScrollForHour = Animated.event(
+    [{nativeEvent: {contentOffset: {y: yForHour}}}],
+    {
+      useNativeDriver: true,
+    },
+  );
+
+  const yForMin = new Animated.Value(0);
+  const onScrollForMin = Animated.event(
+    [{nativeEvent: {contentOffset: {y: yForMin}}}],
+    {
+      useNativeDriver: true,
+    },
+  );
 
   return (
     <SafeAreaView style={backgroundStyle}>
@@ -39,36 +97,20 @@ const App = () => {
         <View style={styles.highlightArea} />
 
         <View style={styles.hourPicker}>
-          <SmoothPicker
-            offsetSelection={0}
-            initialScrollToIndex={7}
-            magnet
-            activeOpacityButton={0.5}
-            scrollAnimation
+          <Animated.FlatList
+            removeClippedSubviews
             showsVerticalScrollIndicator={false}
-            data={Array.from({length: 24}, (_, i) => i + 1)}
-            onSelected={({item}) => setHour(item)}
-            renderItem={({item}) =>
-              item === hour ? (
-                <View style={styles.activeRowContainer}>
-                  <Text style={styles.activeRowText}>
-                    {item.toLocaleString('en-US', {
-                      minimumIntegerDigits: 2,
-                      useGrouping: false,
-                    })}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.inActiveRowContainer}>
-                  <Text style={styles.inActiveRowText}>
-                    {item.toLocaleString('en-US', {
-                      minimumIntegerDigits: 2,
-                      useGrouping: false,
-                    })}
-                  </Text>
-                </View>
-              )
-            }
+            data={[...new Array(5)].reduce(x => [...x, ...hourData], [])}
+            scrollEventThrottle={16}
+            renderItem={({index, item}) => (
+              <MinItem
+                index={index}
+                item={item}
+                y={yForHour}
+                hourRef={selectedItem}
+              />
+            )}
+            onScroll={onScrollForHour}
           />
         </View>
         <View
@@ -81,49 +123,20 @@ const App = () => {
           <Text style={{fontSize: 30, color: 'white', marginBottom: 5}}>:</Text>
         </View>
         <View>
-          <SmoothPicker
-            offsetSelection={0}
-            initialScrollToIndex={0}
-            magnet
-            scrollAnimation
+          <Animated.FlatList
+            removeClippedSubviews
             showsVerticalScrollIndicator={false}
-            data={Array.from({length: 60}, (_, i) => i).filter(
-              x => x % 5 === 0,
+            data={[...new Array(20)].reduce(x => [...x, ...minData], [])}
+            scrollEventThrottle={16}
+            renderItem={({index, item}) => (
+              <MinItem
+                index={index}
+                item={item}
+                y={yForMin}
+                hourRef={selectedItem}
+              />
             )}
-            onSelected={({item}) => setMinute(item)}
-            renderItem={({item}) =>
-              item === minute ? (
-                <View
-                  style={{
-                    height: 60,
-                    width: 60,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <Text style={{fontSize: 30, color: 'white'}}>
-                    {item.toLocaleString('en-US', {
-                      minimumIntegerDigits: 2,
-                      useGrouping: false,
-                    })}
-                  </Text>
-                </View>
-              ) : (
-                <View
-                  style={{
-                    height: 40,
-                    width: 60,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <Text style={{color: 'white'}}>
-                    {item.toLocaleString('en-US', {
-                      minimumIntegerDigits: 2,
-                      useGrouping: false,
-                    })}
-                  </Text>
-                </View>
-              )
-            }
+            onScroll={onScrollForMin}
           />
         </View>
         <View
@@ -138,11 +151,6 @@ const App = () => {
             {'<'}
           </Text>
         </View>
-      </View>
-      <View style={{marginTop: 20, flexDirection: 'row'}}>
-        <Text style={{fontSize: 20}}>
-          {hour} : {minute}
-        </Text>
       </View>
     </SafeAreaView>
   );
@@ -172,7 +180,7 @@ const styles = StyleSheet.create({
     marginLeft: 30,
   },
   activeRowContainer: {
-    height: 60,
+    height: ROW_HEIGHT,
     width: 60,
     justifyContent: 'center',
     alignItems: 'center',
@@ -182,7 +190,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   inActiveRowContainer: {
-    height: 40,
+    height: INACTIVE_ROW_HEIGHT,
     width: 60,
     justifyContent: 'center',
     alignItems: 'center',
